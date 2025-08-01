@@ -55,6 +55,9 @@
 #ifdef SENSOR_INCLUDED_MPU6050_HMC5883L_MS5611
 #include "sensors_mpu6050_hm5883L_ms5611.h"
 #endif
+#ifdef SENSOR_INCLUDED_PHONE_IMU_STREAM
+#include "sensors_phone_imu.h"
+#endif
 
 typedef struct {
   SensorImplementation_t implements;
@@ -160,6 +163,23 @@ static const sensorsImplementation_t sensorImplementations[SensorImplementation_
     .readMag = sensorsBoschReadMag,
     .readBaro = sensorsBoschReadBaro,
     .setAccMode = sensorsBoschSetAccMode,
+    .dataAvailableCallback = nullFunction,
+  },
+#endif
+#ifdef SENSOR_INCLUDED_PHONE_IMU_STREAM
+  {
+    .implements = SensorImplementation_phoneimu_stream,
+    .init = sensorsPhoneImuInit,
+    .test = sensorsPhoneImuTest,
+    .areCalibrated = sensorsPhoneImuAreCalibrated,
+    .manufacturingTest = sensorsPhoneImuManufacturingTest,
+    .acquire = sensorsPhoneImuAcquire,
+    .waitDataReady = sensorsPhoneImuWaitDataReady,
+    .readGyro = sensorsPhoneImuReadGyro,
+    .readAcc = sensorsPhoneImuReadAcc,
+    .readMag = sensorsPhoneImuReadMag,
+    .readBaro = sensorsPhoneImuReadBaro,
+    .setAccMode = sensorsPhoneImuSetAccMode,
     .dataAvailableCallback = nullFunction,
   },
 #endif
