@@ -16,13 +16,13 @@
 #include "debug_cf.h"
 
 typedef struct __attribute__((packed)) {
-    uint64_t timestamp_ns;
     float ax, ay, az;
     float gx, gy, gz;
+    float mx, my, mz;
 } PhoneIMUPacket;
 
 #define PHONEIMU_PORT 12345
-#define PHONEIMU_STACKSIZE 2048
+#define PHONEIMU_STACKSIZE 4096
 #define PHONEIMU_PRIORITY 5
 
 static xQueueHandle accelerometerDataQueue;
@@ -72,20 +72,22 @@ static void phoneImuTask(void* arg)
     while (1) {
         int len = recvfrom(sock, &pkt, sizeof(pkt), 0,
                            (struct sockaddr*)&clientAddr, &addrLen);
-        if (len == sizeof(pkt)) {
-            Axis3f acc = { { pkt.ax, pkt.ay, pkt.az } };
-            Axis3f gyro = { { pkt.gx, pkt.gy, pkt.gz } };
+        if (len == 36) {
+            Axis3f acc = { { pkt.ax * 9.8, pkt.ay * 9.8, pkt.az * 9.8 } };
+            Axis3f gyro = { { pkt.gx * 57.2958, pkt.gy * 57.2958, pkt.gz * 57.2958 } };
 
             sensorData.acc = acc;
             sensorData.gyro = gyro;
-            sensorData.interruptTimestamp = pkt.timestamp_ns / 1000; // microseconds
+            //sensorData.interruptTimestamp = pkt.timestamp_ns / 1000; // microseconds
 
             // Push to queues
             xQueueOverwrite(accelerometerDataQueue, &sensorData.acc);
             xQueueOverwrite(gyroDataQueue, &sensorData.gyro);
             xQueueOverwrite(magnetometerDataQueue, &sensorData.mag);
             xQueueOverwrite(barometerDataQueue, &sensorData.baro);
-
+            
+            DEBUG_PRINTI("Received data from phone acc: %.3f, %.3f, %.3f gyro: %.3f, %.3f, %.3f",
+                         acc.x, acc.y, acc.z, gyro.x, gyro.y, gyro.z);
             // Wake up stabilizer
             xSemaphoreGive(dataReady);
         }
