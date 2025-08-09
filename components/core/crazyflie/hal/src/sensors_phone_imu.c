@@ -47,6 +47,9 @@ static void phoneImuTask(void* arg)
     struct sockaddr_in listenAddr, clientAddr;
     socklen_t addrLen = sizeof(clientAddr);
 
+    int64_t lastTimestamp = 0;
+    float freq = 0;
+
     sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_IP);
     if (sock < 0) {
         DEBUG_PRINTE("Socket create failed");
@@ -73,12 +76,24 @@ static void phoneImuTask(void* arg)
         int len = recvfrom(sock, &pkt, sizeof(pkt), 0,
                            (struct sockaddr*)&clientAddr, &addrLen);
         if (len == 36) {
+            // Get current timestamp in microseconds
+            int64_t now = esp_timer_get_time();  
+            
+            sensorData.interruptTimestamp = now; // microseconds
+
+            // Compute frequency if we have a previous timestamp
+            if (lastTimestamp > 0) {
+                int64_t delta_us = now - lastTimestamp;
+                freq = 1000000.0f / delta_us;  // Hz
+            }
+            lastTimestamp = now;
+
             Axis3f acc = { { pkt.ax * 9.8, pkt.ay * 9.8, pkt.az * 9.8 } };
-            Axis3f gyro = { { pkt.gx * 57.2958, pkt.gy * 57.2958, pkt.gz * 57.2958 } };
+            Axis3f gyro = { { pkt.gx , pkt.gy , pkt.gz  } };
 
             sensorData.acc = acc;
             sensorData.gyro = gyro;
-            //sensorData.interruptTimestamp = pkt.timestamp_ns / 1000; // microseconds
+            
 
             // Push to queues
             xQueueOverwrite(accelerometerDataQueue, &sensorData.acc);
@@ -86,8 +101,11 @@ static void phoneImuTask(void* arg)
             xQueueOverwrite(magnetometerDataQueue, &sensorData.mag);
             xQueueOverwrite(barometerDataQueue, &sensorData.baro);
             
-            DEBUG_PRINTI("Received data from phone acc: %.3f, %.3f, %.3f gyro: %.3f, %.3f, %.3f",
-                         acc.x, acc.y, acc.z, gyro.x, gyro.y, gyro.z);
+            // DEBUG_PRINTI("t=%lld us | freq=%.2f Hz | acc: %.3f, %.3f, %.3f | gyro: %.3f, %.3f, %.3f",
+            //          now, freq,
+            //          acc.x, acc.y, acc.z,
+            //          gyro.x, gyro.y, gyro.z);
+
             // Wake up stabilizer
             xSemaphoreGive(dataReady);
         }
