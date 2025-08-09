@@ -272,8 +272,10 @@ static void genericLocHandle(CRTPPacket* pk)
       break;
     case EMERGENCY_STOP:
       stabilizerSetEmergencyStop();
+      ESP_LOGI(DEBUG_MODULE, "emergency stop from crtp, stopping motors");
       break;
     case EMERGENCY_STOP_WATCHDOG:
+    ESP_LOGI(DEBUG_MODULE, "EMERGENCY_STOP_WATCHDOG received");
       stabilizerSetEmergencyStopTimeout(DEFAULT_EMERGENCY_STOP_TIMEOUT);
       break;
     case EXT_POSE:

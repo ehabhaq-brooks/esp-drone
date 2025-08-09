@@ -35,7 +35,8 @@
 #include "commander.h"
 #include "stabilizer.h"
 #include "motors.h"
-
+#define DEBUG_MODULE "SITAW"
+#include "debug_cf.h"
 /* Trigger object used to detect Free Fall situation. */
 static trigger_t sitAwFFAccWZ;
 
@@ -144,6 +145,7 @@ static void sitAwPreThrustUpdateCallOut(setpoint_t *setpoint)
       if(sitAwTuDetected()) {
         /* Kill the thrust to the motors if a Tumbled situation is detected. */
         stabilizerSetEmergencyStop();
+        ESP_LOGI(DEBUG_MODULE, "sitTuDetected, stopping motors");
       }
 #endif
 

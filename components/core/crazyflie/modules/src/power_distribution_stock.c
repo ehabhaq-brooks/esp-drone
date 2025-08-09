@@ -130,6 +130,9 @@ void powerDistribution(const control_t *control)
     motorsSetRatio(MOTOR_M3, motorPower.m3);
     motorsSetRatio(MOTOR_M4, motorPower.m4);
   }
+
+  // ESP_LOGI(DEBUG_MODULE, "M1: %d, M2: %d, M3: %d, M4: %d",
+  //          motorPower.m1, motorPower.m2, motorPower.m3, motorPower.m4);
 }
 
 PARAM_GROUP_START(motorPowerSet)

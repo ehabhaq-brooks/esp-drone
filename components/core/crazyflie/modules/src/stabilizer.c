@@ -227,6 +227,7 @@ static void checkEmergencyStopTimeout()
     emergencyStopTimeout -= 1;
 
     if (emergencyStopTimeout == 0) {
+      ESP_LOGI(DEBUG_MODULE, "Emergency stop timeout reached, stopping motors");
       emergencyStop = true;
     }
   }
@@ -304,8 +305,10 @@ static void stabilizerTask(void* param)
       checkEmergencyStopTimeout();
 
       checkStops = systemIsArmed();
+      //ESP_LOGI(DEBUG_MODULE, "checkStops: %d, emergencyStop: %d", checkStops, emergencyStop);
       if (emergencyStop || (systemIsArmed() == false)) {
         powerStop();
+        //ESP_LOGI(DEBUG_MODULE,"are we in power stop?");
       } else {
         powerDistribution(&control);
       }
@@ -332,6 +335,7 @@ static void stabilizerTask(void* param)
 
 void stabilizerSetEmergencyStop()
 {
+  ESP_LOGI(DEBUG_MODULE, "Emergency stop forced by stabilizer call, stopping motors");
   emergencyStop = true;
 }
 
@@ -344,6 +348,7 @@ void stabilizerSetEmergencyStopTimeout(int timeout)
 {
   emergencyStop = false;
   emergencyStopTimeout = timeout;
+  ESP_LOGI(DEBUG_MODULE,"we just set the emergency stop");
 }
 
 static float variance(float *buffer, uint32_t length)
