@@ -54,6 +54,9 @@
 #include "debug_cf.h"
 #include "static_mem.h"
 #include "rateSupervisor.h"
+#include "sensors_phone_imu.h"
+
+#define RECEIVE_ATTITUDE_FROM_PHONE_IMU         // If defined, the attitude will be received from the phone IMU instead of being calculated by the estimator
 
 static bool isInit;
 static bool emergencyStop = false;
@@ -292,6 +295,10 @@ static void stabilizerTask(void* param)
       }
 
       stateEstimator(&state, &sensorData, &control, tick);
+#ifdef RECEIVE_ATTITUDE_FROM_PHONE_IMU
+      // If the phone IMU is used, we need to overwrite the state with the phone
+      attitude_acquire_from_phone_imu(&state.attitude, &state.attitudeQuaternion);
+#endif
       compressState();
 
       commanderGetSetpoint(&setpoint, &state);

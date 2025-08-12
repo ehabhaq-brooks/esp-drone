@@ -37,7 +37,7 @@
 #include "stabilizer_types.h"
 #include "static_mem.h"
 
-#define ATTITUDE_UPDATE_RATE RATE_250_HZ
+#define ATTITUDE_UPDATE_RATE RATE_100_HZ
 #define ATTITUDE_UPDATE_DT 1.0/ATTITUDE_UPDATE_RATE
 
 #define POS_UPDATE_RATE RATE_100_HZ

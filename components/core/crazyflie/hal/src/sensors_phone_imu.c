@@ -16,10 +16,17 @@
 #include "debug_cf.h"
 
 typedef struct __attribute__((packed)) {
+    uint64_t timestamp; // Timestamp in microseconds
     float ax, ay, az;
     float gx, gy, gz;
-    float mx, my, mz;
 } PhoneIMUPacket;
+
+typedef struct __attribute__((packed)) {
+    uint64_t timestamp; // Timestamp in microseconds
+    float roll;  // Roll angle in degrees
+    float pitch; // Pitch angle in degrees
+    float yaw;   // Yaw angle in degrees
+} PhoneIMUAttitudePacket;
 
 #define PHONEIMU_PORT 12345
 #define PHONEIMU_STACKSIZE 4096
@@ -34,10 +41,18 @@ STATIC_MEM_QUEUE_ALLOC(magnetometerDataQueue, 1, sizeof(Axis3f));
 static xQueueHandle barometerDataQueue;
 STATIC_MEM_QUEUE_ALLOC(barometerDataQueue, 1, sizeof(baro_t));
 
+static xQueueHandle phone_imu_attitude_queue;
+STATIC_MEM_QUEUE_ALLOC(phone_imu_attitude_queue, 1, sizeof(attitude_t))
+static xQueueHandle phone_imu_quaternion_queue;
+STATIC_MEM_QUEUE_ALLOC(phone_imu_quaternion_queue, 1, sizeof(quaternion_t));
+
 static xSemaphoreHandle dataReady;
 
 static sensorData_t sensorData;
+static attitude_t   phone_imu_attitude;
+static quaternion_t phone_imu_quaternion;
 static bool isInit = false;
+static uint8_t udp_receive_buffer[sizeof(PhoneIMUPacket) + sizeof(PhoneIMUAttitudePacket)];
 
 STATIC_MEM_TASK_ALLOC(phoneImuTask, PHONEIMU_STACKSIZE);
 
@@ -72,24 +87,30 @@ static void phoneImuTask(void* arg)
     DEBUG_PRINTI("Phone IMU listening on UDP port %d", PHONEIMU_PORT);
 
     PhoneIMUPacket pkt;
+    PhoneIMUAttitudePacket attitudePkt;
     while (1) {
-        int len = recvfrom(sock, &pkt, sizeof(pkt), 0,
+        int len = recvfrom(sock, &udp_receive_buffer, sizeof(udp_receive_buffer), 0,
                            (struct sockaddr*)&clientAddr, &addrLen);
-        if (len == 36) {
+        
+        // We received acclerometer and gyro data
+        if (len == 32) {
+            //put packet in respective struct
+            memcpy(&pkt, udp_receive_buffer, sizeof(PhoneIMUPacket));
             // Get current timestamp in microseconds
-            int64_t now = esp_timer_get_time();  
+            int64_t now = pkt.timestamp;  
             
             sensorData.interruptTimestamp = now; // microseconds
 
             // Compute frequency if we have a previous timestamp
             if (lastTimestamp > 0) {
                 int64_t delta_us = now - lastTimestamp;
-                freq = 1000000.0f / delta_us;  // Hz
+                freq = 1000000000.0f / delta_us;  // Hz
             }
             lastTimestamp = now;
 
-            Axis3f acc = { { pkt.ax * 9.8, pkt.ay * 9.8, pkt.az * 9.8 } };
-            Axis3f gyro = { { pkt.gx , pkt.gy , pkt.gz  } };
+            //Axis3f acc = { { pkt.ax * 9.8, pkt.ay * 9.8, pkt.az * 9.8 } };
+            Axis3f acc = { { pkt.ax , pkt.ay , pkt.az } };
+            Axis3f gyro = { { pkt.gx * 57.296 , pkt.gy * 57.296 , pkt.gz * 57.296 } };
 
             sensorData.acc = acc;
             sensorData.gyro = gyro;
@@ -110,10 +131,62 @@ static void phoneImuTask(void* arg)
             xSemaphoreGive(dataReady);
         }
 
+        // We received attitude data
+        if (len == 20)
+        {
+            //put packet in respective struct
+            memcpy(&attitudePkt, udp_receive_buffer, sizeof(PhoneIMUAttitudePacket));
+
+            // Get current timestamp in microseconds
+            int64_t now = attitudePkt.timestamp;
+            // Compute frequency if we have a previous timestamp
+            if (lastTimestamp > 0) {
+                int64_t delta_ms = now - lastTimestamp;
+                freq = 1000.0f / delta_ms;  // Hz
+            }
+            lastTimestamp = now;
+            
+            // Update phone IMU attitude
+            phone_imu_attitude.roll = attitudePkt.roll; 
+            phone_imu_attitude.pitch = attitudePkt.pitch;
+            phone_imu_attitude.yaw = attitudePkt.yaw;
+            // Push to attitude queue
+            xQueueOverwrite(phone_imu_attitude_queue, &phone_imu_attitude);
+            // Update phone IMU quaternion
+            xQueueOverwrite(phone_imu_quaternion_queue, &phone_imu_quaternion);
+
+            //  DEBUG_PRINTI("freq=%.2f Hz |Attitude: roll=%.2f, pitch=%.2f, yaw=%.2f",
+            //           freq, phone_imu_attitude.roll, phone_imu_attitude.pitch, phone_imu_attitude.yaw); 
+            
+            // Wake up stabilizer
+            xSemaphoreGive(dataReady);
+        }
+
         vTaskDelay(1); // Yield to avoid starving other tasks
     }
 }
 
+void attitude_acquire_from_phone_imu(attitude_t *state_attitude, quaternion_t *state_attitudeQuaternion)
+{
+    if (xQueueReceive(phone_imu_attitude_queue, state_attitude, 0) == pdTRUE) {
+        // Successfully received attitude
+    } else {
+        // Handle error or use default values
+        state_attitude->roll = 0.0f;
+        state_attitude->pitch = 0.0f;
+        state_attitude->yaw = 0.0f;
+    }
+
+    if (xQueueReceive(phone_imu_quaternion_queue, state_attitudeQuaternion, 0) == pdTRUE) {
+        // Successfully received quaternion
+    } else {
+        // Handle error or use default values
+        state_attitudeQuaternion->x = 0.0f;
+        state_attitudeQuaternion->y = 0.0f;
+        state_attitudeQuaternion->z = 0.0f;
+        state_attitudeQuaternion->w = 1.0f; // Default quaternion (no rotation)
+    }
+}
 bool sensorsPhoneImuTest(void)
 {
     if (!isInit) {
@@ -183,6 +256,8 @@ void sensorsPhoneImuInit(void)
     gyroDataQueue = STATIC_MEM_QUEUE_CREATE(gyroDataQueue);
     magnetometerDataQueue = STATIC_MEM_QUEUE_CREATE(magnetometerDataQueue);
     barometerDataQueue = STATIC_MEM_QUEUE_CREATE(barometerDataQueue);
+    phone_imu_attitude_queue = STATIC_MEM_QUEUE_CREATE(phone_imu_attitude_queue);
+    phone_imu_quaternion_queue = STATIC_MEM_QUEUE_CREATE(phone_imu_quaternion_queue);
     
     dataReady = xSemaphoreCreateBinary();
 
