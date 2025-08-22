@@ -32,6 +32,10 @@
 #include "param.h"
 #include "num.h"
 #include "position_estimator.h"
+#include "esp_log.h"
+
+
+#define DEBUG_MODULE "ESTIMATOR_ALTITUDE"
 
 #define G 9.81f;
 
@@ -89,6 +93,7 @@ static void positionEstimateInternal(state_t* estimate, const sensorData_t* sens
                   (1.0f - state->estAlphaZrange) * tofMeasurement->distance;
       // Use zrange as base and add velocity changes.
       state->estimatedZ = filteredZ + (state->velocityFactor * state->velocityZ * dt);
+      //ESP_LOGI(DEBUG_MODULE, "if using ToF state->estimatedZ = %.2f", state->estimatedZ);
     }
   } else {
     // FIXME: A bit of an hack to init IIR filter
@@ -101,6 +106,7 @@ static void positionEstimateInternal(state_t* estimate, const sensorData_t* sens
     }
     // Use asl as base and add velocity changes.
     state->estimatedZ = filteredZ + (state->velocityFactor * state->velocityZ * dt);
+    //ESP_LOGI(DEBUG_MODULE, "if using baro state->estimatedZ = %.2f", state->estimatedZ);
   }
 
   estimate->position.x = 0.0f;

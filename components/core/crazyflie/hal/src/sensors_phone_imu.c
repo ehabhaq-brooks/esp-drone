@@ -15,10 +15,14 @@
 #define DEBUG_MODULE "PHONEIMU"
 #include "debug_cf.h"
 
+#include "estimator.h"
+
 typedef struct __attribute__((packed)) {
     uint64_t timestamp; // Timestamp in microseconds
     float ax, ay, az;
     float gx, gy, gz;
+    float mx, my, mz;
+    float depth; // Depth in centimeters
 } PhoneIMUPacket;
 
 typedef struct __attribute__((packed)) {
@@ -26,6 +30,7 @@ typedef struct __attribute__((packed)) {
     float roll;  // Roll angle in degrees
     float pitch; // Pitch angle in degrees
     float yaw;   // Yaw angle in degrees
+    float depth;  // Depth in centimeters
 } PhoneIMUAttitudePacket;
 
 #define PHONEIMU_PORT 12345
@@ -50,6 +55,7 @@ static xSemaphoreHandle dataReady;
 
 static sensorData_t sensorData;
 static attitude_t   phone_imu_attitude;
+tofMeasurement_t tofData;
 static quaternion_t phone_imu_quaternion;
 static bool isInit = false;
 static uint8_t udp_receive_buffer[sizeof(PhoneIMUPacket) + sizeof(PhoneIMUAttitudePacket)];
@@ -92,47 +98,51 @@ static void phoneImuTask(void* arg)
         int len = recvfrom(sock, &udp_receive_buffer, sizeof(udp_receive_buffer), 0,
                            (struct sockaddr*)&clientAddr, &addrLen);
         
+        //ESP_LOGI(DEBUG_MODULE, "Received %d bytes from UDP", len);
         // We received acclerometer and gyro data
-        if (len == 32) {
-            //put packet in respective struct
-            memcpy(&pkt, udp_receive_buffer, sizeof(PhoneIMUPacket));
-            // Get current timestamp in microseconds
-            int64_t now = pkt.timestamp;  
+        if (len == 48) {
+            // //put packet in respective struct
+             memcpy(&pkt, udp_receive_buffer, sizeof(PhoneIMUPacket));
+            // // Get current timestamp in microseconds
+            // int64_t now = pkt.timestamp;  
             
-            sensorData.interruptTimestamp = now; // microseconds
+            // sensorData.interruptTimestamp = now; // microseconds
 
-            // Compute frequency if we have a previous timestamp
-            if (lastTimestamp > 0) {
-                int64_t delta_us = now - lastTimestamp;
-                freq = 1000000000.0f / delta_us;  // Hz
-            }
-            lastTimestamp = now;
+            // // Compute frequency if we have a previous timestamp
+            // if (lastTimestamp > 0) {
+            //     int64_t delta_us = now - lastTimestamp;
+            //     freq = 1000000000.0f / delta_us;  // Hz
+            // }
+            // lastTimestamp = now;
 
             //Axis3f acc = { { pkt.ax * 9.8, pkt.ay * 9.8, pkt.az * 9.8 } };
-            Axis3f acc = { { pkt.ax , pkt.ay , pkt.az } };
-            Axis3f gyro = { { pkt.gx * 57.296 , pkt.gy * 57.296 , pkt.gz * 57.296 } };
+            // to reverse the z-axis you have to reverse the corresponding opposite gyroscope axis as well
+            Axis3f acc = { { (pkt.ax  ) , (pkt.ay ) , (pkt.az  * -1.0) } };
+            Axis3f gyro = { { pkt.gx * 57.296 * -1.0 , pkt.gy * 57.296 * -1.0 , pkt.gz * 57.296 } };
 
             sensorData.acc = acc;
             sensorData.gyro = gyro;
-            
+            tofData.timestamp = xTaskGetTickCount(); // should be in processor ticks
+            tofData.distance = pkt.depth * 0.01f; // Convert cm to m
+            tofData.stdDev = 1.0f; // Assume a fixed standard deviation for depth measurement
 
             // Push to queues
             xQueueOverwrite(accelerometerDataQueue, &sensorData.acc);
             xQueueOverwrite(gyroDataQueue, &sensorData.gyro);
             xQueueOverwrite(magnetometerDataQueue, &sensorData.mag);
             xQueueOverwrite(barometerDataQueue, &sensorData.baro);
-            
-            // DEBUG_PRINTI("t=%lld us | freq=%.2f Hz | acc: %.3f, %.3f, %.3f | gyro: %.3f, %.3f, %.3f",
-            //          now, freq,
+            estimatorEnqueueTOF(&tofData);
+
+            // DEBUG_PRINTI(" acc: %.3f, %.3f, %.3f | gyro: %.3f, %.3f, %.3f tof : %.3f",
             //          acc.x, acc.y, acc.z,
-            //          gyro.x, gyro.y, gyro.z);
+            //          gyro.x, gyro.y, gyro.z, tofData.distance);
 
             // Wake up stabilizer
             xSemaphoreGive(dataReady);
         }
 
         // We received attitude data
-        if (len == 20)
+        if (len == 24)
         {
             //put packet in respective struct
             memcpy(&attitudePkt, udp_receive_buffer, sizeof(PhoneIMUAttitudePacket));
@@ -141,8 +151,8 @@ static void phoneImuTask(void* arg)
             int64_t now = attitudePkt.timestamp;
             // Compute frequency if we have a previous timestamp
             if (lastTimestamp > 0) {
-                int64_t delta_ms = now - lastTimestamp;
-                freq = 1000.0f / delta_ms;  // Hz
+                int64_t delta_us = now - lastTimestamp;
+                freq = 1000000.0f / delta_us;  // Hz
             }
             lastTimestamp = now;
             
@@ -150,13 +160,18 @@ static void phoneImuTask(void* arg)
             phone_imu_attitude.roll = attitudePkt.roll; 
             phone_imu_attitude.pitch = attitudePkt.pitch;
             phone_imu_attitude.yaw = attitudePkt.yaw;
+
+            tofData.timestamp = xTaskGetTickCount(); // should be in processor ticks
+            tofData.distance = attitudePkt.depth * 0.01f; // Convert cm to m
+            tofData.stdDev = 1.0f; // Assume a fixed standard deviation for depth measurement
             // Push to attitude queue
             xQueueOverwrite(phone_imu_attitude_queue, &phone_imu_attitude);
             // Update phone IMU quaternion
             xQueueOverwrite(phone_imu_quaternion_queue, &phone_imu_quaternion);
-
-            //  DEBUG_PRINTI("freq=%.2f Hz |Attitude: roll=%.2f, pitch=%.2f, yaw=%.2f",
-            //           freq, phone_imu_attitude.roll, phone_imu_attitude.pitch, phone_imu_attitude.yaw); 
+            // Update TOF data queue
+            estimatorEnqueueTOF(&tofData);
+            //  DEBUG_PRINTI("freq=%.2f Hz |Attitude: roll=%.2f, pitch=%.2f, yaw=%.2f, depth=%.2f cm",
+            //           freq, phone_imu_attitude.roll, phone_imu_attitude.pitch, phone_imu_attitude.yaw, attitudePkt.depth); 
             
             // Wake up stabilizer
             xSemaphoreGive(dataReady);

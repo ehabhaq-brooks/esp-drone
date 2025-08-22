@@ -267,7 +267,7 @@ typedef struct {
 #define RATE_50_HZ 50
 #define RATE_25_HZ 25
 
-#define RATE_MAIN_LOOP RATE_1000_HZ
+#define RATE_MAIN_LOOP RATE_100_HZ
 #define ATTITUDE_RATE RATE_100_HZ
 #define POSITION_RATE RATE_100_HZ
 

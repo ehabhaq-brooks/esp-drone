@@ -66,7 +66,7 @@ bool pwm_timmer_init()
     }
 
     ledc_timer_config_t ledc_timer = {
-        .duty_resolution = LEDC_TIMER_16_BIT,  // 0–65535
+        .duty_resolution = LEDC_TIMER_14_BIT,  // 0–16383
         .freq_hz = 50,
         .speed_mode = LEDC_LOW_SPEED_MODE,
         .timer_num = LEDC_TIMER_0,
@@ -127,8 +127,8 @@ void motorsSetRatio(uint32_t id, uint16_t ithrust)
         uint32_t pulse_us = PWM_MIN_PULSE_US +
             ((uint32_t)ithrust * (PWM_MAX_PULSE_US - PWM_MIN_PULSE_US)) / 65535;
 
-        // Convert pulse_us to duty cycle for 16-bit resolution
-        uint32_t duty = (pulse_us * ((1 << 16) - 1)) / PWM_PERIOD_US;
+        // Convert pulse_us to duty cycle for 14-bit resolution
+        uint32_t duty = (pulse_us * ((1 << 14) )) / PWM_PERIOD_US;
 
         ledc_set_duty(motors_channel[id].speed_mode, motors_channel[id].channel, duty);
         ledc_update_duty(motors_channel[id].speed_mode, motors_channel[id].channel);
