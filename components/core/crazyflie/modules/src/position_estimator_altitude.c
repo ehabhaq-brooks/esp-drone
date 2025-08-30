@@ -50,10 +50,10 @@ static struct selfState_s state = {
   .estimatedZ = 0.0f,
   .velocityZ = 0.0f,
   .estAlphaZrange = 0.90f,
-  .estAlphaAsl = 0.997f,
+  .estAlphaAsl = 1.0f,
   .velocityFactor = 1.0f,
   .vAccDeadband = 0.04f,
-  .velZAlpha = 0.995f,
+  .velZAlpha = 1.0f,
   .estimatedVZ = 0.0f,
 };
 

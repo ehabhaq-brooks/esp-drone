@@ -536,6 +536,8 @@ static void sensorsDeviceInit(void)
     }
 #endif
 
+    setCommandermode(ALTHOLD_MODE);
+    DEBUG_PRINTI("Initialized in ALTHOLD_MODE");
     DEBUG_PRINTI("sensors init done");
     /*
     *get calib angle from NVS

@@ -149,7 +149,7 @@ static struct this_s this = {
   .thrustMin  = 20000,
   #endif
 #else
-  .thrustBase = 24000,
+  .thrustBase = 20000,
   .thrustMin  = 5000,
 #endif
 
