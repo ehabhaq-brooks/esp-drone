@@ -31,14 +31,14 @@
 #include "filter.h"
 
 #ifdef CONFIG_TARGET_ESP32_S2_DRONE_V1_2
-  #define PID_ROLL_RATE_KP  190.0
-  #define PID_ROLL_RATE_KI  440.0
-  #define PID_ROLL_RATE_KD  2.6
+  #define PID_ROLL_RATE_KP  92.0
+  #define PID_ROLL_RATE_KI  110.0
+  #define PID_ROLL_RATE_KD  0.35
   #define PID_ROLL_RATE_INTEGRATION_LIMIT    33.3
 
-  #define PID_PITCH_RATE_KP  190.0
-  #define PID_PITCH_RATE_KI  440.0
-  #define PID_PITCH_RATE_KD  2.6
+  #define PID_PITCH_RATE_KP  92.0
+  #define PID_PITCH_RATE_KI  110.0                          //340.0
+  #define PID_PITCH_RATE_KD  0.35                          //2.6
   #define PID_PITCH_RATE_INTEGRATION_LIMIT   33.3
 
   #define PID_YAW_RATE_KP  120.0
