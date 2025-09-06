@@ -117,8 +117,8 @@ static void phoneImuTask(void* arg)
 
             //Axis3f acc = { { pkt.ax * 9.8, pkt.ay * 9.8, pkt.az * 9.8 } };
             // to reverse the z-axis you have to reverse the corresponding opposite gyroscope axis as well
-            Axis3f acc = { { (pkt.ax  ) , (pkt.ay ) , (pkt.az  * -1.0) } };
-            Axis3f gyro = { { pkt.gx * 57.296 * -1.0 , pkt.gy * 57.296 * -1.0 , pkt.gz * 57.296 } };
+            Axis3f acc = { {  (pkt.ay ) ,(pkt.ax  ), (pkt.az  * -1.0) } };
+            Axis3f gyro = { { pkt.gy * 57.296 , pkt.gx * 57.296 , pkt.gz * 57.296 } };
 
             sensorData.acc = acc;
             sensorData.gyro = gyro;
