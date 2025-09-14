@@ -31,6 +31,8 @@
 #include "pid.h"
 #include "param.h"
 #include "log.h"
+#define DEBUG_MODULE "ATTITUDE_CONTROLLER"
+#include "debug_cf.h"
 
 #define ATTITUDE_LPF_CUTOFF_FREQ      15.0f
 #define ATTITUDE_LPF_ENABLE false
@@ -90,6 +92,8 @@ void attitudeControllerInit(const float updateDt)
   pidSetIntegralLimit(&pidPitch, PID_PITCH_INTEGRATION_LIMIT);
   pidSetIntegralLimit(&pidYaw,   PID_YAW_INTEGRATION_LIMIT);
 
+  //DEBUG_PRINTI("Done Initializing PID controller pidrollrate P Gain = %f",PID_ROLL_RATE_KP);
+
   isInit = true;
 }
 
@@ -110,6 +114,9 @@ void attitudeControllerCorrectRatePID(
 
   pidSetDesired(&pidYawRate, yawRateDesired);
   yawOutput = saturateSignedInt16(pidUpdate(&pidYawRate, yawRateActual, true));
+
+  //DEBUG_PRINTI("Done Initializing PID controller pidrollrate P Gain = %f",pidRollRate.kp);
+
 }
 
 void attitudeControllerCorrectAttitudePID(

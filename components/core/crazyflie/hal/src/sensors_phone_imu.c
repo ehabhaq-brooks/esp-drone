@@ -7,15 +7,28 @@
 #include "lwip/sockets.h"
 #include "lwip/netdb.h"
 #include "esp_log.h"
+#include "param.h"
+#include "log.h"
+
+#include "mpu6050.h"
+#include "hmc5883l.h"
+#include "ms5611.h"
 
 #include "sensors_phone_imu.h"
 #include "imu.h"
 #include "static_mem.h"
 
-#define DEBUG_MODULE "PHONEIMU"
+#define DEBUG_MODULE "SENSORS"
 #include "debug_cf.h"
+#include "static_mem.h"
+#include "crtp_commander.h"
 
 #include "estimator.h"
+
+
+#define SENSORS_ENABLE_RANGE_VL53L1X
+#define SENSORS_ENABLE_FLOW_PMW3901
+
 
 typedef struct __attribute__((packed)) {
     uint64_t timestamp; // Timestamp in microseconds
@@ -23,6 +36,9 @@ typedef struct __attribute__((packed)) {
     float gx, gy, gz;
     float mx, my, mz;
     float depth; // Depth in centimeters
+    float roll;  // Roll angle in degrees
+    float pitch; // Pitch angle in degrees
+    float yaw;   // Yaw angle in degrees
 } PhoneIMUPacket;
 
 typedef struct __attribute__((packed)) {
@@ -59,6 +75,20 @@ tofMeasurement_t tofData;
 static quaternion_t phone_imu_quaternion;
 static bool isInit = false;
 static uint8_t udp_receive_buffer[sizeof(PhoneIMUPacket) + sizeof(PhoneIMUAttitudePacket)];
+
+
+static bool isBarometerPresent = false;
+static bool isMagnetometerPresent = false;
+#ifdef SENSORS_ENABLE_RANGE_VL53L1X
+static bool isVl53l1xPresent = false;
+#endif
+#ifdef SENSORS_ENABLE_RANGE_VL53L0X
+static bool isVl53l0xPresent = false;
+#endif
+#ifdef SENSORS_ENABLE_FLOW_PMW3901
+static bool isPmw3901Present = false;
+#endif
+static bool isMpu6050TestPassed = false;
 
 STATIC_MEM_TASK_ALLOC(phoneImuTask, PHONEIMU_STACKSIZE);
 
@@ -100,7 +130,7 @@ static void phoneImuTask(void* arg)
         
         //ESP_LOGI(DEBUG_MODULE, "Received %d bytes from UDP", len);
         // We received acclerometer and gyro data
-        if (len == 48) {
+        if (len == 60) {
             // //put packet in respective struct
              memcpy(&pkt, udp_receive_buffer, sizeof(PhoneIMUPacket));
             // // Get current timestamp in microseconds
@@ -126,16 +156,24 @@ static void phoneImuTask(void* arg)
             tofData.distance = pkt.depth * 0.01f; // Convert cm to m
             tofData.stdDev = 1.0f; // Assume a fixed standard deviation for depth measurement
 
+            // Update phone IMU attitude
+            phone_imu_attitude.roll = pkt.roll; 
+            phone_imu_attitude.pitch = pkt.pitch * -1.0; // Invert pitch to match Crazyflie convention
+            phone_imu_attitude.yaw = pkt.yaw;
+
+
             // Push to queues
             xQueueOverwrite(accelerometerDataQueue, &sensorData.acc);
             xQueueOverwrite(gyroDataQueue, &sensorData.gyro);
             xQueueOverwrite(magnetometerDataQueue, &sensorData.mag);
             xQueueOverwrite(barometerDataQueue, &sensorData.baro);
+            xQueueOverwrite(phone_imu_attitude_queue, &phone_imu_attitude);
             estimatorEnqueueTOF(&tofData);
 
-            // DEBUG_PRINTI(" acc: %.3f, %.3f, %.3f | gyro: %.3f, %.3f, %.3f tof : %.3f",
+            // DEBUG_PRINTI(" acc: %.3f, %.3f, %.3f | gyro: %.3f, %.3f, %.3f tof : %.3f roll: %.2f, pitch: %.2f, yaw: %.2f",
             //          acc.x, acc.y, acc.z,
-            //          gyro.x, gyro.y, gyro.z, tofData.distance);
+            //          gyro.x, gyro.y, gyro.z, tofData.distance,
+            //          phone_imu_attitude.roll, phone_imu_attitude.pitch, phone_imu_attitude.yaw);
 
             // Wake up stabilizer
             xSemaphoreGive(dataReady);
@@ -209,6 +247,7 @@ bool sensorsPhoneImuTest(void)
         return false;
     }
 
+    isMpu6050TestPassed = true; // Assume test passed for phone IMU
     // Assume the phone IMU is always ready and calibrated
     return true;
 }
@@ -286,3 +325,15 @@ void sensorsPhoneImuWaitDataReady(void)
 {
     xSemaphoreTake(dataReady, portMAX_DELAY);
 }
+
+PARAM_GROUP_START(imu_sensors)
+PARAM_ADD(PARAM_UINT8 | PARAM_RONLY, HMC5883L, &isMagnetometerPresent)
+PARAM_ADD(PARAM_UINT8 | PARAM_RONLY, MS5611, &isBarometerPresent) // TODO: Rename MS5611 to LPS25H. Client needs to be updated at the same time.
+PARAM_GROUP_STOP(imu_sensors)
+
+PARAM_GROUP_START(imu_tests)
+PARAM_ADD(PARAM_UINT8 | PARAM_RONLY, mpu6050, &isMpu6050TestPassed)
+PARAM_ADD(PARAM_UINT8 | PARAM_RONLY, HMC5883L, &isMagnetometerPresent)
+PARAM_ADD(PARAM_UINT8 | PARAM_RONLY, pmw3901, &isPmw3901Present)
+PARAM_ADD(PARAM_UINT8 | PARAM_RONLY, MS5611, &isBarometerPresent) // TODO: Rename MS5611 to LPS25H. Client needs to be updated at the same time.
+PARAM_GROUP_STOP(imu_tests)

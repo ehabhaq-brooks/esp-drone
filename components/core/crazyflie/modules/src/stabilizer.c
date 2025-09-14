@@ -56,7 +56,7 @@
 #include "rateSupervisor.h"
 #include "sensors_phone_imu.h"
 
-//#define RECEIVE_ATTITUDE_FROM_PHONE_IMU         // If defined, the attitude will be received from the phone IMU instead of being calculated by the estimator
+#define RECEIVE_ATTITUDE_FROM_PHONE_IMU         // If defined, the attitude will be received from the phone IMU instead of being calculated by the estimator
 
 static bool isInit;
 static bool emergencyStop = false;
