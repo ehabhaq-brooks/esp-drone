@@ -34,7 +34,7 @@ static platformConfig_t configs[] = {
     {
         .deviceType = "EP20",
         .deviceTypeName = "ESPlane 2.0 ",
-        .sensorImplementation = SensorImplementation_phoneimu_stream,
+        .sensorImplementation = SensorImplementation_mpu6050_HMC5883L_MS5611,
         .physicalLayoutAntennasAreClose = false,
         .motorMap = motorMapDefaultBrushed,
     },

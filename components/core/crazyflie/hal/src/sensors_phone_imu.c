@@ -133,17 +133,17 @@ static void phoneImuTask(void* arg)
         if (len == 60) {
             // //put packet in respective struct
              memcpy(&pkt, udp_receive_buffer, sizeof(PhoneIMUPacket));
-            // // Get current timestamp in microseconds
-            // int64_t now = pkt.timestamp;  
+            // Get current timestamp in microseconds
+            int64_t now = pkt.timestamp;  
             
-            // sensorData.interruptTimestamp = now; // microseconds
+            sensorData.interruptTimestamp = xTaskGetTickCount();
 
-            // // Compute frequency if we have a previous timestamp
-            // if (lastTimestamp > 0) {
-            //     int64_t delta_us = now - lastTimestamp;
-            //     freq = 1000000000.0f / delta_us;  // Hz
-            // }
-            // lastTimestamp = now;
+            // Compute frequency if we have a previous timestamp
+            if (lastTimestamp > 0) {
+                int64_t delta_us = now - lastTimestamp;
+                freq = 1000000.0f / delta_us;  // Hz
+            }
+            lastTimestamp = now;
 
             //Axis3f acc = { { pkt.ax * 9.8, pkt.ay * 9.8, pkt.az * 9.8 } };
             // to reverse the z-axis you have to reverse the corresponding opposite gyroscope axis as well
@@ -170,11 +170,11 @@ static void phoneImuTask(void* arg)
             xQueueOverwrite(phone_imu_attitude_queue, &phone_imu_attitude);
             estimatorEnqueueTOF(&tofData);
 
-            // DEBUG_PRINTI(" acc: %.3f, %.3f, %.3f | gyro: %.3f, %.3f, %.3f tof : %.3f roll: %.2f, pitch: %.2f, yaw: %.2f",
-            //          acc.x, acc.y, acc.z,
-            //          gyro.x, gyro.y, gyro.z, tofData.distance,
-            //          phone_imu_attitude.roll, phone_imu_attitude.pitch, phone_imu_attitude.yaw);
-
+            // DEBUG_PRINTI("freq=%.2f Hz | acc: %.3f, %.3f, %.3f | gyro: %.3f, %.3f, %.3f | tof : %.3f | roll: %.2f, pitch: %.2f, yaw: %.2f",
+            //           freq, acc.x, acc.y, acc.z,
+            //           gyro.x, gyro.y, gyro.z, tofData.distance,
+            //           phone_imu_attitude.roll, phone_imu_attitude.pitch, phone_imu_attitude.yaw);
+                      
             // Wake up stabilizer
             xSemaphoreGive(dataReady);
         }

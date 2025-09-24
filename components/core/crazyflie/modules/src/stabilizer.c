@@ -272,6 +272,19 @@ static void stabilizerTask(void* param)
   while(1) {
     // The sensor should unlock at 1kHz
     sensorsWaitDataReady();
+      // --- Loop frequency measurement ---
+      static int loop_counter = 0;
+      static int64_t last_log_time_us = 0;
+      int64_t now_us = esp_timer_get_time();
+      loop_counter++;
+      if (last_log_time_us == 0) {
+        last_log_time_us = now_us;
+      } else if (now_us - last_log_time_us >= 1000000) { // 1 second
+        ESP_LOGI("STAB", "Stabilizer loop frequency: %d Hz", loop_counter);
+        loop_counter = 0;
+        last_log_time_us = now_us;
+      }
+      // --- End loop frequency measurement ---
 
     if (startPropTest != false) {
       // TODO: What happens with estimator when we run tests after startup?
@@ -319,6 +332,7 @@ static void stabilizerTask(void* param)
       } else {
         powerDistribution(&control);
       }
+
 
       //TODO: Log data to uSD card if configured
       /*if (usddeckLoggingEnabled()
