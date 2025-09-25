@@ -61,6 +61,7 @@
 #include "zranger2.h"
 #include "vl53l1x.h"
 #include "flowdeck_v1v2.h"
+#include "sensors_phone_imu.h"
 #define DEBUG_MODULE "SENSORS"
 #include "debug_cf.h"
 #include "static_mem.h"
@@ -498,9 +499,10 @@ static void sensorsDeviceInit(void)
 #endif
 
 #ifdef SENSORS_ENABLE_RANGE_VL53L1X
-    zRanger2Init();
+    sensorsPhoneImuInit();
+    //zRanger2Init();
 
-    if (zRanger2Test() == true) {
+    if (sensorsPhoneImuTest() == true) {
         isVl53l1xPresent = true;
         DEBUG_PRINTI("VL53L1X I2C connection [OK].\n");
     } else {
