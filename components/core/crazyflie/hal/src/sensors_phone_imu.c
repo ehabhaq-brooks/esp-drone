@@ -50,6 +50,13 @@ typedef struct __attribute__((packed)) {
     float depth;  // Depth in centimeters
 } PhoneIMUAttitudePacket;
 
+typedef struct __attribute__((packed)) {
+    uint64_t timestamp; // Timestamp in microseconds
+    float x;  // X position in meters
+    float y;  // Y position in meters
+    float z;  // Z position in meters
+} PhoneAbsolutePositionPacket;
+
 #define PHONEIMU_PORT 12345
 #define PHONEIMU_STACKSIZE 4096
 #define PHONEIMU_PRIORITY 5
@@ -72,6 +79,7 @@ static xSemaphoreHandle dataReady;
 
 static sensorData_t sensorData;
 static attitude_t   phone_imu_attitude;
+static positionMeasurement_t phone_absolute_position;
 tofMeasurement_t tofData;
 static quaternion_t phone_imu_quaternion;
 static bool isInit = false;
@@ -88,6 +96,16 @@ static bool isVl53l0xPresent = false;
 #endif
 #ifdef SENSORS_ENABLE_FLOW_PMW3901
 static bool isPmw3901Present = false;
+// Disables pushing the flow measurement in the EKF
+static bool useFlowDisabled = false;
+
+// Turn on adaptive standard deviation for the kalman filter
+static bool useAdaptiveStd = true;
+
+// Set standard deviation flow 
+// (will not work if useAdaptiveStd is on)
+static float flowStdFixed = 2.0f;
+
 #endif
 static bool isMpu6050TestPassed = false;
 
@@ -125,6 +143,8 @@ static void phoneImuTask(void* arg)
 
     PhoneIMUPacket pkt;
     PhoneIMUAttitudePacket attitudePkt;
+    PhoneAbsolutePositionPacket positionPkt;
+
     while (1) {
         int len = recvfrom(sock, &udp_receive_buffer, sizeof(udp_receive_buffer), 0,
                            (struct sockaddr*)&clientAddr, &addrLen);
@@ -181,7 +201,7 @@ static void phoneImuTask(void* arg)
         }
 
         // We received attitude data
-        if (len == 24)
+        else if (len == 24)
         {
             //put packet in respective struct
             memcpy(&attitudePkt, udp_receive_buffer, sizeof(PhoneIMUAttitudePacket));
@@ -216,6 +236,36 @@ static void phoneImuTask(void* arg)
             xSemaphoreGive(dataReady);
         }
 
+        // We received phone positioning x,y,z data
+        else if (len == 20)
+        {
+            // //put packet in respective struct
+             memcpy(&positionPkt, udp_receive_buffer, sizeof(PhoneIMUPacket));
+            // Get current timestamp in microseconds
+            int64_t now = positionPkt.timestamp;  
+            
+            sensorData.interruptTimestamp = xTaskGetTickCount();
+
+            // Compute frequency if we have a previous timestamp
+            if (lastTimestamp > 0) {
+                int64_t delta_us = now - lastTimestamp;
+                freq = 1000000.0f / delta_us;  // Hz
+            }
+            lastTimestamp = now;
+
+            phone_absolute_position.x = positionPkt.y;  //swapped to match crazyflie. crazyflie considers x as forward facing axis
+            phone_absolute_position.y = positionPkt.x;  //swapped to match crazyflie.
+            phone_absolute_position.z = positionPkt.z;
+            phone_absolute_position.stdDev = 1.0f; // Assume a fixed standard deviation for position measurement
+            // Push to queues
+            estimatorEnqueuePosition(&phone_absolute_position);
+            // DEBUG_PRINTI("freq=%.2f Hz | Position: x=%.3f, y=%.3f, z=%.3f",
+            //           freq, phone_absolute_position.x, phone_absolute_position.y, phone_absolute_position.z);
+            
+            // Wake up stabilizer
+            xSemaphoreGive(dataReady);
+
+        }
         vTaskDelay(1); // Yield to avoid starving other tasks
     }
 }
@@ -355,6 +405,11 @@ PARAM_ADD_CORE(PARAM_UINT8 | PARAM_RONLY, bcMultiranger, &disable)
 PARAM_ADD(PARAM_UINT8 | PARAM_RONLY, bcOA, &disable)
 PARAM_ADD_CORE(PARAM_UINT8 | PARAM_RONLY, bcServo, &disable)
 PARAM_ADD_CORE(PARAM_UINT8 | PARAM_RONLY, bcUSD, &disable)
+PARAM_ADD(PARAM_UINT8 | PARAM_RONLY, bcFlow, &disable)
+PARAM_ADD(PARAM_UINT8 | PARAM_RONLY, bcFlow2, &isInit)
+PARAM_ADD(PARAM_UINT8, disable, &useFlowDisabled)
+PARAM_ADD(PARAM_UINT8, adaptive, &useAdaptiveStd)
+PARAM_ADD(PARAM_FLOAT, flowStdFixed, &flowStdFixed)
 PARAM_GROUP_STOP(deck)
 
 

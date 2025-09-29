@@ -101,7 +101,7 @@ void setCommandermode(FlightMode mode){
     altHoldMode = true;
     posHoldMode = true;
     posSetMode = false;
-    registerRequiredEstimator(kalmanEstimator); 
+    registerRequiredEstimator(complementaryEstimator); 
     break;
   case POSSET_MODE:
     altHoldMode = false;

@@ -44,16 +44,24 @@
 #define POS_UPDATE_DT 1.0/POS_UPDATE_RATE
 
 static bool latestTofMeasurement(tofMeasurement_t* tofMeasurement);
+static bool latestPositionMeasurement(positionMeasurement_t* positionMeasurement);
 
 // Measurements of TOF from laser sensor
 #define TOF_QUEUE_LENGTH (1)
 static xQueueHandle tofDataQueue;
 STATIC_MEM_QUEUE_ALLOC(tofDataQueue, TOF_QUEUE_LENGTH, sizeof(tofMeasurement_t));
 
+// Measurements of position data from external source
+#define POSITION_QUEUE_LENGTH (1)
+static xQueueHandle positionDataQueue;
+STATIC_MEM_QUEUE_ALLOC(positionDataQueue, POSITION_QUEUE_LENGTH, sizeof(positionMeasurement_t));
+
+
 
 void estimatorComplementaryInit(void)
 {
   tofDataQueue = STATIC_MEM_QUEUE_CREATE(tofDataQueue);
+  positionDataQueue = STATIC_MEM_QUEUE_CREATE(positionDataQueue);
 
   sensfusion6Init();
 }
@@ -95,15 +103,28 @@ void estimatorComplementary(state_t *state, sensorData_t *sensorData, control_t 
 
   if (RATE_DO_EXECUTE(POS_UPDATE_RATE, tick)) {
     tofMeasurement_t tofMeasurement;
+    positionMeasurement_t positionMeasurement;
 
-    latestTofMeasurement(&tofMeasurement);
-    positionEstimate(state, sensorData, &tofMeasurement, POS_UPDATE_DT, tick);
+    if (latestPositionMeasurement(&positionMeasurement)) {
+      // If we have a position measurement, use it to correct the position estimate
+      state->position.x = positionMeasurement.x;
+      state->position.y = positionMeasurement.y;
+      state->position.z = positionMeasurement.z;
+    }
+
+    //latestTofMeasurement(&tofMeasurement);
+    positionEstimate(state, sensorData, &positionMeasurement, POS_UPDATE_DT, tick);
   }
 }
 
 static bool latestTofMeasurement(tofMeasurement_t* tofMeasurement) {
   return xQueuePeek(tofDataQueue, tofMeasurement, 0) == pdTRUE;
 }
+
+static bool latestPositionMeasurement(positionMeasurement_t* positionMeasurement) {
+  return xQueuePeek(positionDataQueue, positionMeasurement, 0) == pdTRUE;
+}
+
 
 static bool overwriteMeasurement(xQueueHandle queue, void *measurement)
 {
@@ -128,4 +149,10 @@ bool estimatorComplementaryEnqueueTOF(const tofMeasurement_t *tof)
 {
   // A distance (distance) [m] to the ground along the z_B axis.
   return overwriteMeasurement(tofDataQueue, (void *)tof);
+}
+
+bool estimatorEnqueuePositionMeasurement(const positionMeasurement_t *position)
+{
+  // posiiton in xy z co-ordinates of drone in [m].
+  return overwriteMeasurement(positionDataQueue, (void *)position);
 }

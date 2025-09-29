@@ -526,11 +526,10 @@ static void sensorsDeviceInit(void)
 #endif
 
 #ifdef SENSORS_ENABLE_FLOW_PMW3901
-    flowdeck2Init();
 
-    if (flowdeck2Test() == true) {
+    if (sensorsPhoneImuTest() == true) {
         isPmw3901Present = true;
-        setCommandermode(POSHOLD_MODE);
+        //setCommandermode(POSHOLD_MODE);
         DEBUG_PRINTI("PMW3901 SPI connection [OK].\n");
     } else {
         //TODO: Should sensor test fail hard if no connection
@@ -538,9 +537,6 @@ static void sensorsDeviceInit(void)
     }
 #endif
 
-    //setCommandermode(ALTHOLD_MODE);
-    DEBUG_PRINTI("Initialized in ALTHOLD_MODE");
-    DEBUG_PRINTI("sensors init done");
     /*
     *get calib angle from NVS
     */

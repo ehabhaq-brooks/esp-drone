@@ -33,5 +33,6 @@ bool estimatorComplementaryTest(void);
 void estimatorComplementary(state_t *state, sensorData_t *sensors, control_t *control, const uint32_t tick);
 
 bool estimatorComplementaryEnqueueTOF(const tofMeasurement_t *tof);
+bool estimatorEnqueuePositionMeasurement(const positionMeasurement_t *position);
 
 #endif //__ESTIMATOR_COMPLEMENTARY_H__
