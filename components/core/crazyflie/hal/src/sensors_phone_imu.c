@@ -2,6 +2,7 @@
 #include "FreeRTOS.h"
 #include "task.h"
 #include "queue.h"
+#include "num.h"
 #include "semphr.h"
 
 #include "lwip/sockets.h"
@@ -55,7 +56,10 @@ typedef struct __attribute__((packed)) {
     float x;  // X position in meters
     float y;  // Y position in meters
     float z;  // Z position in meters
-} PhoneAbsolutePositionPacket;
+    float vx; // Velocity in X direction in m/s
+    float vy; // Velocity in Y direction in m/s
+    float vz; // Velocity in Z direction in m/s
+} PhoneAbsolutePosition_velocity_Packet;
 
 #define PHONEIMU_PORT 12345
 #define PHONEIMU_STACKSIZE 4096
@@ -80,11 +84,12 @@ static xSemaphoreHandle dataReady;
 static sensorData_t sensorData;
 static attitude_t   phone_imu_attitude;
 static positionMeasurement_t phone_absolute_position;
+static velocityMeasurement_t phone_velocity;
 tofMeasurement_t tofData;
 static quaternion_t phone_imu_quaternion;
 static bool isInit = false;
 static uint8_t udp_receive_buffer[sizeof(PhoneIMUPacket) + sizeof(PhoneIMUAttitudePacket)];
-
+struct sockaddr_in  clientAddr;
 
 static bool isBarometerPresent = false;
 static bool isMagnetometerPresent = false;
@@ -111,11 +116,16 @@ static bool isMpu6050TestPassed = false;
 
 STATIC_MEM_TASK_ALLOC(phoneImuTask, PHONEIMU_STACKSIZE);
 
+int sock;
+struct sockaddr_in listenAddr;
+socklen_t addrLen = sizeof(clientAddr);
+
 static void phoneImuTask(void* arg)
 {
-    int sock;
-    struct sockaddr_in listenAddr, clientAddr;
-    socklen_t addrLen = sizeof(clientAddr);
+    
+    static float previous_x = 0;
+    static float previous_y = 0;
+
 
     int64_t lastTimestamp = 0;
     float freq = 0;
@@ -143,7 +153,7 @@ static void phoneImuTask(void* arg)
 
     PhoneIMUPacket pkt;
     PhoneIMUAttitudePacket attitudePkt;
-    PhoneAbsolutePositionPacket positionPkt;
+    PhoneAbsolutePosition_velocity_Packet positionPkt;
 
     while (1) {
         int len = recvfrom(sock, &udp_receive_buffer, sizeof(udp_receive_buffer), 0,
@@ -237,39 +247,61 @@ static void phoneImuTask(void* arg)
         }
 
         // We received phone positioning x,y,z data
-        else if (len == 20)
+        else if (len == 32)
         {
             // //put packet in respective struct
-             memcpy(&positionPkt, udp_receive_buffer, sizeof(PhoneIMUPacket));
+             memcpy(&positionPkt, udp_receive_buffer, sizeof(positionPkt));
             // Get current timestamp in microseconds
             int64_t now = positionPkt.timestamp;  
-            
+            float delta_seconds = 0.1f; // Default to 0.1s if no previous timestamp available
+
             sensorData.interruptTimestamp = xTaskGetTickCount();
 
             // Compute frequency if we have a previous timestamp
             if (lastTimestamp > 0) {
                 int64_t delta_us = now - lastTimestamp;
+                delta_seconds = delta_us / 1000000.0f;
                 freq = 1000000.0f / delta_us;  // Hz
             }
             lastTimestamp = now;
 
-            phone_absolute_position.x = positionPkt.y;  //swapped to match crazyflie. crazyflie considers x as forward facing axis
-            phone_absolute_position.y = positionPkt.x;  //swapped to match crazyflie.
+            phone_absolute_position.x = positionPkt.x;  //swapped to match crazyflie. crazyflie considers x as forward facing axis
+            phone_absolute_position.y = positionPkt.y;  //swapped to match crazyflie.
             phone_absolute_position.z = positionPkt.z;
             phone_absolute_position.stdDev = 1.0f; // Assume a fixed standard deviation for position measurement
+
+            phone_velocity.vx = deadband(positionPkt.vx, 0.00); //(phone_absolute_position.x - previous_x) / delta_seconds;
+            phone_velocity.vy = deadband(positionPkt.vy, 0.00);//(phone_absolute_position.y - previous_y) / delta_seconds;
             // Push to queues
             estimatorEnqueuePosition(&phone_absolute_position);
-            // DEBUG_PRINTI("freq=%.2f Hz | Position: x=%.3f, y=%.3f, z=%.3f",
-            //           freq, phone_absolute_position.x, phone_absolute_position.y, phone_absolute_position.z);
+            estimatorEnqueueVelocity(&phone_velocity);
+            // DEBUG_PRINTI("freq=%.2f Hz | Position: x=%.3f, y=%.3f, z=%.3f vx=%.3f, vy=%.3f",
+            //           freq, phone_absolute_position.x, phone_absolute_position.y, phone_absolute_position.z
+            //           , phone_velocity.vx, phone_velocity.vy);
+
             
             // Wake up stabilizer
             xSemaphoreGive(dataReady);
+
+            previous_x = phone_absolute_position.x;
+            previous_y = phone_absolute_position.y;
 
         }
         vTaskDelay(1); // Yield to avoid starving other tasks
     }
 }
 
+void send_reset_origin_to_phone()
+{
+    const char *reset_msg = "RESET";
+        int err = sendto(sock, reset_msg, strlen(reset_msg), 0,
+                            (struct sockaddr *)&clientAddr, addrLen);
+        if (err < 0) {
+            ESP_LOGE(DEBUG_MODULE, "Error occurred during sending: errno %d", errno);
+        } else {
+            ESP_LOGI(DEBUG_MODULE, "Sent reset command to phone");
+        }
+}
 void attitude_acquire_from_phone_imu(attitude_t *state_attitude, quaternion_t *state_attitudeQuaternion)
 {
     if (xQueueReceive(phone_imu_attitude_queue, state_attitude, 0) == pdTRUE) {

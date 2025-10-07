@@ -16,6 +16,9 @@
 // Initialize the Phone IMU sensor
 void sensorsPhoneImuInit(void);
 
+// resets the origin on the phone side. x/y/z = 0
+void send_reset_origin_to_phone();
+
 // Read the latest attitude from the Phone IMU
 void attitude_acquire_from_phone_imu(attitude_t *state_attitude, quaternion_t *state_attitudeQuaternion);
 
