@@ -32,6 +32,7 @@
 #include "param.h"
 #include "num.h"
 #include "position_estimator.h"
+#include "esp_log.h"
 
 #define G 9.81f;
 
@@ -71,6 +72,9 @@ void positionUpdateVelocity(float accWZ, float dt) {
 static void positionEstimateInternal(state_t* estimate, const sensorData_t* sensorData, const positionMeasurement_t* posMeasurement, float dt, uint32_t tick, struct selfState_s* state) {
   float filteredZ;
   static float prev_estimatedZ = 0;
+  static float prev_estimatedX = 0;
+  static float prev_estimatedY = 0;
+
   static bool surfaceFollowingMode = false;
 
 
@@ -82,13 +86,12 @@ static void positionEstimateInternal(state_t* estimate, const sensorData_t* sens
   // Use zrange as base and add velocity changes.
   state->estimatedZ = filteredZ + (state->velocityFactor * state->velocityZ * dt);
 
-  // use previous values to calculate speed in x and y
-  estimate->velocity.x = ( posMeasurement->x - estimate->position.x ) / dt;
-  estimate->velocity.y = ( posMeasurement->y - estimate->position.y ) / dt;
-
   // Now update the position new obtained values from phone sensor
   estimate->position.x = posMeasurement->x;
   estimate->position.y = posMeasurement->y;
+
+  // prev_estimatedX = estimate->position.x;
+  // prev_estimatedY = estimate->position.y;
 
   estimate->position.z = state->estimatedZ;
   estimate->velocity.z = (state->estimatedZ - prev_estimatedZ) / dt;

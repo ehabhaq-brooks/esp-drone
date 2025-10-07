@@ -107,6 +107,19 @@ typedef struct positionMeasurement_s {
   float stdDev;
 } positionMeasurement_t;
 
+typedef struct velocityMeasurement_s {
+  union {
+    struct {
+      float vx;
+      float vy;
+      float vz;
+    };
+    float vel[3];
+  };
+  float stdDev;
+} velocityMeasurement_t;
+
+
 typedef struct poseMeasurement_s {
   union {
     struct {
@@ -269,7 +282,7 @@ typedef struct {
 
 #define RATE_MAIN_LOOP RATE_1000_HZ
 #define ATTITUDE_RATE RATE_500_HZ
-#define POSITION_RATE RATE_100_HZ
+#define POSITION_RATE RATE_50_HZ
 
 #define RATE_DO_EXECUTE(RATE_HZ, TICK) ((TICK % (RATE_MAIN_LOOP / RATE_HZ)) == 0)
 

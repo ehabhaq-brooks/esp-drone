@@ -21,6 +21,7 @@ typedef struct {
   const char* name;
   bool (*estimatorEnqueueTDOA)(const tdoaMeasurement_t *uwb);
   bool (*estimatorEnqueuePosition)(const positionMeasurement_t *pos);
+  bool (*estimatorEnqueueVelocity)(const velocityMeasurement_t *vel);
   bool (*estimatorEnqueuePose)(const poseMeasurement_t *pose);
   bool (*estimatorEnqueueDistance)(const distanceMeasurement_t *dist);
   bool (*estimatorEnqueueTOF)(const tofMeasurement_t *tof);
@@ -41,6 +42,7 @@ static EstimatorFcns estimatorFunctions[] = {
         .name = "None",
         .estimatorEnqueueTDOA = NOT_IMPLEMENTED,
         .estimatorEnqueuePosition = NOT_IMPLEMENTED,
+        .estimatorEnqueueVelocity = NOT_IMPLEMENTED,
         .estimatorEnqueuePose = NOT_IMPLEMENTED,
         .estimatorEnqueueDistance = NOT_IMPLEMENTED,
         .estimatorEnqueueTOF = NOT_IMPLEMENTED,
@@ -57,6 +59,7 @@ static EstimatorFcns estimatorFunctions[] = {
         .name = "Complementary",
         .estimatorEnqueueTDOA = NOT_IMPLEMENTED,
         .estimatorEnqueuePosition = estimatorEnqueuePositionMeasurement,
+        .estimatorEnqueueVelocity = estimatorEnqueueVelocityMeasurement,
         .estimatorEnqueuePose = NOT_IMPLEMENTED,
         .estimatorEnqueueDistance = NOT_IMPLEMENTED,
         .estimatorEnqueueTOF = estimatorComplementaryEnqueueTOF,
@@ -73,6 +76,7 @@ static EstimatorFcns estimatorFunctions[] = {
         .name = "Kalman",
         .estimatorEnqueueTDOA = estimatorKalmanEnqueueTDOA,
         .estimatorEnqueuePosition = estimatorKalmanEnqueuePosition,
+        .estimatorEnqueueVelocity = NOT_IMPLEMENTED,
         .estimatorEnqueuePose = estimatorKalmanEnqueuePose,
         .estimatorEnqueueDistance = estimatorKalmanEnqueueDistance,
         .estimatorEnqueueTOF = estimatorKalmanEnqueueTOF,
@@ -184,6 +188,14 @@ bool estimatorEnqueueYawError(const yawErrorMeasurement_t* error) {
 bool estimatorEnqueuePosition(const positionMeasurement_t *pos) {
   if (estimatorFunctions[currentEstimator].estimatorEnqueuePosition) {
     return estimatorFunctions[currentEstimator].estimatorEnqueuePosition(pos);
+  }
+
+  return false;
+}
+
+bool estimatorEnqueueVelocity(const velocityMeasurement_t *vel) {
+  if (estimatorFunctions[currentEstimator].estimatorEnqueueVelocity) {
+    return estimatorFunctions[currentEstimator].estimatorEnqueueVelocity(vel);
   }
 
   return false;

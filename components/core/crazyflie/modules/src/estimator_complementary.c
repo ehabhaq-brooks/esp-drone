@@ -40,11 +40,12 @@
 #define ATTITUDE_UPDATE_RATE RATE_250_HZ
 #define ATTITUDE_UPDATE_DT 1.0/ATTITUDE_UPDATE_RATE
 
-#define POS_UPDATE_RATE RATE_100_HZ
+#define POS_UPDATE_RATE RATE_50_HZ
 #define POS_UPDATE_DT 1.0/POS_UPDATE_RATE
 
 static bool latestTofMeasurement(tofMeasurement_t* tofMeasurement);
 static bool latestPositionMeasurement(positionMeasurement_t* positionMeasurement);
+static bool latestVelocityMeasurement(velocityMeasurement_t* velocityMeasurement);
 
 // Measurements of TOF from laser sensor
 #define TOF_QUEUE_LENGTH (1)
@@ -56,12 +57,18 @@ STATIC_MEM_QUEUE_ALLOC(tofDataQueue, TOF_QUEUE_LENGTH, sizeof(tofMeasurement_t))
 static xQueueHandle positionDataQueue;
 STATIC_MEM_QUEUE_ALLOC(positionDataQueue, POSITION_QUEUE_LENGTH, sizeof(positionMeasurement_t));
 
+// Measurements of position data from external source
+#define VELOCITY_QUEUE_LENGTH (1)
+static xQueueHandle velDataQueue;
+STATIC_MEM_QUEUE_ALLOC(velDataQueue, VELOCITY_QUEUE_LENGTH, sizeof(velocityMeasurement_t));
+
 
 
 void estimatorComplementaryInit(void)
 {
   tofDataQueue = STATIC_MEM_QUEUE_CREATE(tofDataQueue);
   positionDataQueue = STATIC_MEM_QUEUE_CREATE(positionDataQueue);
+  velDataQueue = STATIC_MEM_QUEUE_CREATE(velDataQueue);
 
   sensfusion6Init();
 }
@@ -104,16 +111,17 @@ void estimatorComplementary(state_t *state, sensorData_t *sensorData, control_t 
   if (RATE_DO_EXECUTE(POS_UPDATE_RATE, tick)) {
     tofMeasurement_t tofMeasurement;
     positionMeasurement_t positionMeasurement;
+    velocityMeasurement_t velocityMeasurement;
 
-    if (latestPositionMeasurement(&positionMeasurement)) {
+    if (latestPositionMeasurement(&positionMeasurement) && latestVelocityMeasurement(&velocityMeasurement)) {
       // If we have a position measurement, use it to correct the position estimate
-      state->position.x = positionMeasurement.x;
-      state->position.y = positionMeasurement.y;
-      state->position.z = positionMeasurement.z;
+      state->velocity.x = velocityMeasurement.vx;
+      state->velocity.y = velocityMeasurement.vy;
+      
+      //latestTofMeasurement(&tofMeasurement);
+      positionEstimate(state, sensorData, &positionMeasurement, POS_UPDATE_DT, tick);
     }
 
-    //latestTofMeasurement(&tofMeasurement);
-    positionEstimate(state, sensorData, &positionMeasurement, POS_UPDATE_DT, tick);
   }
 }
 
@@ -125,6 +133,9 @@ static bool latestPositionMeasurement(positionMeasurement_t* positionMeasurement
   return xQueuePeek(positionDataQueue, positionMeasurement, 0) == pdTRUE;
 }
 
+static bool latestVelocityMeasurement(velocityMeasurement_t* velocityMeasurement) {
+  return xQueuePeek(velDataQueue, velocityMeasurement, 0) == pdTRUE;
+}
 
 static bool overwriteMeasurement(xQueueHandle queue, void *measurement)
 {
@@ -155,4 +166,10 @@ bool estimatorEnqueuePositionMeasurement(const positionMeasurement_t *position)
 {
   // posiiton in xy z co-ordinates of drone in [m].
   return overwriteMeasurement(positionDataQueue, (void *)position);
+}
+
+bool estimatorEnqueueVelocityMeasurement(const velocityMeasurement_t *vel)
+{
+  // velocity in xy z co-ordinates of drone in [m/s].
+  return overwriteMeasurement(velDataQueue, (void *)vel);
 }
