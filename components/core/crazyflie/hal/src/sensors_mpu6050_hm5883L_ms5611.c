@@ -361,7 +361,24 @@ void processAccGyroMeasurements(const uint8_t *buffer)
     gyroRaw.x = (((int16_t)buffer[10]) << 8) | buffer[11];
     gyroRaw.z = (((int16_t)buffer[12]) << 8) | buffer[13];
 #endif
+/* --- MPU6050 mounted 90deg clockwise (Z-axis rotation) --- */
+    int16_t ax = accelRaw.x;
+    int16_t ay = accelRaw.y;
+    int16_t az = accelRaw.z;
 
+    int16_t gx = gyroRaw.x;
+    int16_t gy = gyroRaw.y;
+    int16_t gz = gyroRaw.z;
+
+    /* Axis remap */
+    accelRaw.x =  ay;
+    accelRaw.y = -ax;
+    accelRaw.z =  az;
+
+    gyroRaw.x  =  gy;
+    gyroRaw.y  = -gx;
+    gyroRaw.z  =  gz;
+    
 #ifdef GYRO_BIAS_LIGHT_WEIGHT
     gyroBiasFound = processGyroBiasNoBuffer(gyroRaw.x, gyroRaw.y, gyroRaw.z, &gyroBias);
 #else
