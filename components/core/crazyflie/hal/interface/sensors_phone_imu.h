@@ -20,7 +20,7 @@ void sensorsPhoneImuInit(void);
 void send_reset_origin_to_phone();
 
 // Read the latest attitude from the Phone IMU
-void attitude_acquire_from_phone_imu(attitude_t *state_attitude, quaternion_t *state_attitudeQuaternion);
+void attitude_acquire_from_phone_imu(attitude_t *state_attitude);
 
 // Acquire the latest accelerometer & gyro readings
 void sensorsPhoneImuAcquire(sensorData_t* sensors, const uint32_t tick);

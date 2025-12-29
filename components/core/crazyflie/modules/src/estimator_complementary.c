@@ -36,6 +36,7 @@
 #include "sensors.h"
 #include "stabilizer_types.h"
 #include "static_mem.h"
+#include "sensors_phone_imu.h"
 
 #define ATTITUDE_UPDATE_RATE RATE_250_HZ
 #define ATTITUDE_UPDATE_DT 1.0/ATTITUDE_UPDATE_RATE
@@ -92,6 +93,11 @@ void estimatorComplementary(state_t *state, sensorData_t *sensorData, control_t 
 
     // Save attitude, adjusted for the legacy CF2 body coordinate system
     sensfusion6GetEulerRPY(&state->attitude.roll, &state->attitude.pitch, &state->attitude.yaw);
+
+    attitude_t phone_attitude;    
+    // only acquiring yaw angle from phone imu
+    attitude_acquire_from_phone_imu(&phone_attitude);
+    state->attitude.yaw = phone_attitude.yaw; // Use yaw from phone IMU
 
     // Save quaternion, hopefully one day this could be used in a better controller.
     // Note that this is not adjusted for the legacy coordinate system

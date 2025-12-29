@@ -36,7 +36,7 @@
 #include "position_controller.h"
 #define DEBUG_MODULE "POSITION_CONTROLLER"
 #include "debug_cf.h"
-
+#include "esp_log.h"
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
 #endif
@@ -87,45 +87,45 @@ static const float thrustScale = 1000.0f;
 static struct this_s this = {
   .pidVX = {
     .init = {
-      .kp = 25.0f,
-      .ki = 1.0f,
-      .kd = 0.0f,
+      .kp = 12.0f,
+      .ki = 2.5f,
+      .kd = 0.01f,
     },
     .pid.dt = DT,
   },
 
   .pidVY = {
     .init = {
-      .kp = 25.0f,
-      .ki = 1.0f,
-      .kd = 0.0f,
+      .kp = 12.0f,
+      .ki = 2.5f,
+      .kd = 0.01f,
     },
     .pid.dt = DT,
   },
 
   .pidVZ = {
     .init = {
-      .kp = 10,
-      .ki = 7,
-      .kd = 0,
+      .kp = 10.0f,
+      .ki = 7.0f,
+      .kd = 0.0f,
     },
     .pid.dt = DT,
   },
 
   .pidX = {
     .init = {
-      .kp = 1.9f,
-      .ki = 0.1f,
-      .kd = 0,
+      .kp = 0.6f,
+      .ki = 0.5f,
+      .kd = 0.1f,
     },
     .pid.dt = DT,
   },
 
   .pidY = {
     .init = {
-      .kp = 1.9f,
-      .ki = 0.1f,
-      .kd = 0,
+      .kp = 0.6f,
+      .ki = 0.5f,
+      .kd = 0.1f,
     },
     .pid.dt = DT,
   },
@@ -133,8 +133,8 @@ static struct this_s this = {
   .pidZ = {
     .init = {
       .kp = 1.6f,
-      .ki = 0.5,
-      .kd = 0,
+      .ki = 0.5f,
+      .kd = 0.0f,
     },
     .pid.dt = DT,
   },
@@ -165,6 +165,9 @@ void positionControllerInit()
   pidInit(&this.pidZ.pid, this.pidZ.setpoint, this.pidZ.init.kp, this.pidZ.init.ki, this.pidZ.init.kd,
       this.pidZ.pid.dt, POSITION_RATE, POSITION_LPF_CUTOFF_FREQ, POSITION_LPF_ENABLE);
 
+  // pidSetIntegralLimit(&this.pidX.pid,  PID_XPOSITION_INTEGRATION_LIMIT);
+  // pidSetIntegralLimit(&this.pidY.pid,  PID_YPOSITION_INTEGRATION_LIMIT);
+
   pidInit(&this.pidVX.pid, this.pidVX.setpoint, this.pidVX.init.kp, this.pidVX.init.ki, this.pidVX.init.kd,
       this.pidVX.pid.dt, POSITION_RATE, POSITION_LPF_CUTOFF_FREQ, POSITION_LPF_ENABLE);
   pidInit(&this.pidVY.pid, this.pidVY.setpoint, this.pidVY.init.kp, this.pidVY.init.ki, this.pidVY.init.kd,
@@ -172,6 +175,10 @@ void positionControllerInit()
   pidInit(&this.pidVZ.pid, this.pidVZ.setpoint, this.pidVZ.init.kp, this.pidVZ.init.ki, this.pidVZ.init.kd,
       this.pidVZ.pid.dt, POSITION_RATE, POSITION_LPF_CUTOFF_FREQ, POSITION_LPF_ENABLE);
   DEBUG_PRINTI("thrustBase = %d,thrustMin  = %d",this.thrustBase,this.thrustMin);
+
+  // pidSetIntegralLimit(&this.pidVX.pid,  PID_XVELOCITY_INTEGRATION_LIMIT);
+  // pidSetIntegralLimit(&this.pidVY.pid,  PID_YVELOCITY_INTEGRATION_LIMIT);
+
 }
 
 static float runPid(float input, struct pidAxis_s *axis, float setpoint, float dt) {
@@ -230,6 +237,7 @@ void velocityController(float* thrust, attitude_t *attitude, setpoint_t *setpoin
   attitude->pitch = -(rollRaw  * cosf(yawRad)) - (pitchRaw * sinf(yawRad));
   attitude->roll  = -(pitchRaw * cosf(yawRad)) + (rollRaw  * sinf(yawRad));
 
+  //ESP_LOGI (DEBUG_MODULE, "rpLimit = %f",rpLimit);
   attitude->roll  = constrain(attitude->roll,  -rpLimit, rpLimit);
   attitude->pitch = constrain(attitude->pitch, -rpLimit, rpLimit);
 

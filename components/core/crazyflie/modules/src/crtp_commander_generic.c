@@ -36,6 +36,7 @@
 #include "quatcompress.h"
 #include "FreeRTOS.h"
 #include "cfassert.h"
+#include "esp_log.h"
 
 /* The generic commander format contains a packet type and data that has to be
  * decoded into a setpoint_t structure. The aim is to make it future-proof
@@ -289,12 +290,22 @@ static void hoverDecoder(setpoint_t *setpoint, uint8_t type, const void *data, s
   setpoint->attitudeRate.yaw = -values->yawrate;
 
 
-  setpoint->mode.x = modeVelocity;
-  setpoint->mode.y = modeVelocity;
-  setpoint->velocity.x = values->vx;
-  setpoint->velocity.y = values->vy;
+  // setpoint->mode.x = modeVelocity;
+  // setpoint->mode.y = modeVelocity;
+  // setpoint->velocity.x = values->vx;
+  // setpoint->velocity.y = values->vy;
 
-  setpoint->velocity_body = true;
+  // changing temprarily to make it work with position controller
+  setpoint->mode.x = modeAbs;
+  setpoint->mode.y = modeAbs;
+  setpoint->position.x = setpoint->position.x + values->vx;
+  setpoint->position.y = setpoint->position.y + values->vy;
+
+  // ESP_LOGI("commader", "sp->pos.x = %f sp->pos.y = %f values->vx = %f values->vy = %f", setpoint->position.x,
+  //                         setpoint->position.y, values->vx, values->vy );
+
+  //setpoint->velocity_body = true;
+  setpoint->velocity_body = false; // we input world-frame velocity
 }
 
 struct fullStatePacket_s {

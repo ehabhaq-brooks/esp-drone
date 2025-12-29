@@ -31,7 +31,8 @@
 #include "cfassert.h"
 #include "commander.h"
 #include "crtp.h"
-
+#include "sensors_phone_imu.h"
+#include "esp_log.h"
 
 static bool isInit;
 
@@ -110,13 +111,27 @@ const static metaCommandDecoder_t metaCommandDecoders[] = {
 static void commanderCrtpCB(CRTPPacket* pk)
 {
   static setpoint_t setpoint;
-
+  static bool reset_send_flag = 0;
   if(pk->port == CRTP_PORT_SETPOINT && pk->channel == 0) {
     crtpCommanderRpytDecodeSetpoint(&setpoint, pk);
     commanderSetSetpoint(&setpoint, COMMANDER_PRIORITY_CRTP);
+    // reset the send flag so that next time we do generic setpoint we
+    // reset the phone origin X/Y/Z
+    reset_send_flag = 1;
   } else if (pk->port == CRTP_PORT_SETPOINT_GENERIC) {
     switch (pk->channel) {
     case SET_SETPOINT_CHANNEL:
+      if ( reset_send_flag == 1 ) {
+        // if we have sent a reset command, ignore the first setpoint command
+        // this is to avoid a sudden jump in setpoint when switching from
+        // phone imu to external controller
+        reset_send_flag = 0;
+        //setpoint.position.x = 0;
+        //setpoint.position.y = 0;
+        send_reset_origin_to_phone();
+      }
+      // ESP_LOGI("CRTP_CMD_GEN", "sp->pos.x = %f sp->pos.y = %f ", setpoint.position.x,
+      //                     setpoint.position.y );
       crtpCommanderGenericDecodeSetpoint(&setpoint, pk);
       commanderSetSetpoint(&setpoint, COMMANDER_PRIORITY_CRTP);
       break;

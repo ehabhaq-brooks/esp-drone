@@ -59,6 +59,7 @@ typedef struct __attribute__((packed)) {
     float vx; // Velocity in X direction in m/s
     float vy; // Velocity in Y direction in m/s
     float vz; // Velocity in Z direction in m/s
+    float yaw; // Yaw angle in degrees
 } PhoneAbsolutePosition_velocity_Packet;
 
 #define PHONEIMU_PORT 12345
@@ -247,7 +248,7 @@ static void phoneImuTask(void* arg)
         }
 
         // We received phone positioning x,y,z data
-        else if (len == 32)
+        else if (len == 36)
         {
             // //put packet in respective struct
              memcpy(&positionPkt, udp_receive_buffer, sizeof(positionPkt));
@@ -272,12 +273,19 @@ static void phoneImuTask(void* arg)
 
             phone_velocity.vx = deadband(positionPkt.vx, 0.00); //(phone_absolute_position.x - previous_x) / delta_seconds;
             phone_velocity.vy = deadband(positionPkt.vy, 0.00);//(phone_absolute_position.y - previous_y) / delta_seconds;
+
+            // Update phone IMU attitude
+            phone_imu_attitude.roll = 0; 
+            phone_imu_attitude.pitch = 0; // Invert pitch to match Crazyflie convention
+            phone_imu_attitude.yaw = - positionPkt.yaw; //reverse sign to match with crazyflie coordinate system
+
             // Push to queues
             estimatorEnqueuePosition(&phone_absolute_position);
             estimatorEnqueueVelocity(&phone_velocity);
-            // DEBUG_PRINTI("freq=%.2f Hz | Position: x=%.3f, y=%.3f, z=%.3f vx=%.3f, vy=%.3f",
+            xQueueOverwrite(phone_imu_attitude_queue, &phone_imu_attitude);
+            // DEBUG_PRINTI("freq=%.2f Hz | Position: x=%.3f, y=%.3f, z=%.3f vx=%.3f, vy=%.3f yaw=%.3f",
             //           freq, phone_absolute_position.x, phone_absolute_position.y, phone_absolute_position.z
-            //           , phone_velocity.vx, phone_velocity.vy);
+            //           , phone_velocity.vx, phone_velocity.vy,phone_imu_attitude.yaw );
 
             
             // Wake up stabilizer
@@ -302,26 +310,11 @@ void send_reset_origin_to_phone()
             ESP_LOGI(DEBUG_MODULE, "Sent reset command to phone");
         }
 }
-void attitude_acquire_from_phone_imu(attitude_t *state_attitude, quaternion_t *state_attitudeQuaternion)
+void attitude_acquire_from_phone_imu(attitude_t *state_attitude)
 {
-    if (xQueueReceive(phone_imu_attitude_queue, state_attitude, 0) == pdTRUE) {
-        // Successfully received attitude
-    } else {
-        // Handle error or use default values
-        state_attitude->roll = 0.0f;
-        state_attitude->pitch = 0.0f;
-        state_attitude->yaw = 0.0f;
-    }
 
-    if (xQueueReceive(phone_imu_quaternion_queue, state_attitudeQuaternion, 0) == pdTRUE) {
-        // Successfully received quaternion
-    } else {
-        // Handle error or use default values
-        state_attitudeQuaternion->x = 0.0f;
-        state_attitudeQuaternion->y = 0.0f;
-        state_attitudeQuaternion->z = 0.0f;
-        state_attitudeQuaternion->w = 1.0f; // Default quaternion (no rotation)
-    }
+        state_attitude->yaw = phone_imu_attitude.yaw;
+
 }
 bool sensorsPhoneImuTest(void)
 {
