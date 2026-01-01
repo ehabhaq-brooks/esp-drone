@@ -123,6 +123,7 @@ void estimatorComplementary(state_t *state, sensorData_t *sensorData, control_t 
       // If we have a position measurement, use it to correct the position estimate
       state->velocity.x = velocityMeasurement.vx;
       state->velocity.y = velocityMeasurement.vy;
+      state->velocity.z = velocityMeasurement.vz;
       
       //latestTofMeasurement(&tofMeasurement);
       positionEstimate(state, sensorData, &positionMeasurement, POS_UPDATE_DT, tick);
