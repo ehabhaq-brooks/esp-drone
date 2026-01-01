@@ -317,6 +317,9 @@ void attitude_acquire_from_phone_imu(attitude_t *state_attitude)
 {
 
         state_attitude->yaw = phone_imu_attitude.yaw;
+        state_attitude->roll = phone_imu_attitude.roll;
+        state_attitude->pitch = phone_imu_attitude.pitch;
+
 
 }
 bool sensorsPhoneImuTest(void)

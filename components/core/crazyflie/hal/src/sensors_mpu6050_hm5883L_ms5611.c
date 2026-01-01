@@ -424,7 +424,7 @@ static void sensorsDeviceInit(void)
     i2cdevInit(I2C0_DEV);
     mpu6050Init(I2C0_DEV);
 
-    if (mpu6050TestConnection() == true)
+    if /*(mpu6050TestConnection() ==*/ true)
     {
         DEBUG_PRINTI("MPU6050 I2C connection [OK].\n");
     }

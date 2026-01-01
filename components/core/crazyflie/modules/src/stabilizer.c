@@ -86,6 +86,11 @@ static STATS_CNT_RATE_DEFINE(stabilizerRate, 500);
 static rateSupervisor_t rateSupervisorContext;
 static bool rateWarningDisplayed = false;
 
+static TaskHandle_t stabilizerTaskHandle = NULL;
+static TimerHandle_t stabilizerTimer = NULL;
+
+static void stabilizerTimerCallback(TimerHandle_t xTimer);
+void stabilizerTimerInit(void);
 static struct {
   // position - mm
   int16_t x;
@@ -248,26 +253,32 @@ static void stabilizerTask(void* param)
   #endif
 #endif
 
+  stabilizerTaskHandle = xTaskGetCurrentTaskHandle();
+
   //Wait for the system to be fully started to start stabilization loop
   systemWaitStart();
 
   DEBUG_PRINTI("Wait for sensor calibration...\n");
 
-  // Wait for sensors to be calibrated
-  lastWakeTime = xTaskGetTickCount();
-  while(!sensorsAreCalibrated()) {
-    vTaskDelayUntil(&lastWakeTime, F2T(RATE_MAIN_LOOP));
-  }
+  // // Wait for sensors to be calibrated
+  // lastWakeTime = xTaskGetTickCount();
+  // while(!sensorsAreCalibrated()) {
+  //   vTaskDelayUntil(&lastWakeTime, F2T(RATE_MAIN_LOOP));
+  // }
   // Initialize tick to something else then 0
   tick = 1;
 
   rateSupervisorInit(&rateSupervisorContext, xTaskGetTickCount(), M2T(1000), 997, 1003, 1);
 
+    /* Start 1 kHz OS timer */
+  stabilizerTimerInit();
+
   DEBUG_PRINTI("Ready to fly.\n");
 
   while(1) {
-    // The sensor should unlock at 1kHz
-    sensorsWaitDataReady();
+
+        /* Block until 1 kHz timer fires */
+    ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
 
     if (startPropTest != false) {
       // TODO: What happens with estimator when we run tests after startup?
@@ -328,6 +339,32 @@ static void stabilizerTask(void* param)
       }
     }
   }
+}
+
+static void stabilizerTimerCallback(TimerHandle_t xTimer)
+{
+  BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+
+  if (stabilizerTaskHandle != NULL) {
+    vTaskNotifyGiveFromISR(stabilizerTaskHandle, &xHigherPriorityTaskWoken);
+  }
+
+  portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+}
+
+void stabilizerTimerInit(void)
+{
+  stabilizerTimer = xTimerCreate(
+    "stab1kHz",
+    pdMS_TO_TICKS(1),   // 1 kHz
+    pdTRUE,             // auto-reload
+    NULL,
+    stabilizerTimerCallback
+  );
+
+  configASSERT(stabilizerTimer != NULL);
+
+  xTimerStart(stabilizerTimer, 0);
 }
 
 void stabilizerSetEmergencyStop()
