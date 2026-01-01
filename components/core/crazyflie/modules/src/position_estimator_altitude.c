@@ -77,26 +77,10 @@ static void positionEstimateInternal(state_t* estimate, const sensorData_t* sens
 
   static bool surfaceFollowingMode = false;
 
-
-  // first fuse vertical position estimate from accelerometer and position measurement
-
-  // IIR filter zrange
-  filteredZ = (state->estAlphaZrange       ) * state->estimatedZ +
-              (1.0f - state->estAlphaZrange) * posMeasurement->z;
-  // Use zrange as base and add velocity changes.
-  state->estimatedZ = filteredZ + (state->velocityFactor * state->velocityZ * dt);
-
   // Now update the position new obtained values from phone sensor
   estimate->position.x = posMeasurement->x;
   estimate->position.y = posMeasurement->y;
-
-  // prev_estimatedX = estimate->position.x;
-  // prev_estimatedY = estimate->position.y;
-
-  estimate->position.z = state->estimatedZ;
-  estimate->velocity.z = (state->estimatedZ - prev_estimatedZ) / dt;
-  state->estimatedVZ = estimate->velocity.z;
-  prev_estimatedZ = state->estimatedZ;
+  estimate->position.z = posMeasurement->z;
 }
 
 static void positionUpdateVelocityInternal(float accWZ, float dt, struct selfState_s* state) {

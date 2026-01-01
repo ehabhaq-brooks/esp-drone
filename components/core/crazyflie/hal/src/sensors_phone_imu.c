@@ -60,6 +60,8 @@ typedef struct __attribute__((packed)) {
     float vy; // Velocity in Y direction in m/s
     float vz; // Velocity in Z direction in m/s
     float yaw; // Yaw angle in degrees
+    float pitch; // Pitch angle in degrees
+    float roll;  // Roll angle in degrees
 } PhoneAbsolutePosition_velocity_Packet;
 
 #define PHONEIMU_PORT 12345
@@ -248,7 +250,7 @@ static void phoneImuTask(void* arg)
         }
 
         // We received phone positioning x,y,z data
-        else if (len == 36)
+        else if (len == 44)
         {
             // //put packet in respective struct
              memcpy(&positionPkt, udp_receive_buffer, sizeof(positionPkt));
@@ -273,10 +275,11 @@ static void phoneImuTask(void* arg)
 
             phone_velocity.vx = deadband(positionPkt.vx, 0.00); //(phone_absolute_position.x - previous_x) / delta_seconds;
             phone_velocity.vy = deadband(positionPkt.vy, 0.00);//(phone_absolute_position.y - previous_y) / delta_seconds;
+            phone_velocity.vz = deadband(positionPkt.vz, 0.00);
 
             // Update phone IMU attitude
-            phone_imu_attitude.roll = 0; 
-            phone_imu_attitude.pitch = 0; // Invert pitch to match Crazyflie convention
+            phone_imu_attitude.roll = -positionPkt.roll; // Invert roll to match Crazyflie convention
+            phone_imu_attitude.pitch = positionPkt.pitch; 
             phone_imu_attitude.yaw = - positionPkt.yaw; //reverse sign to match with crazyflie coordinate system
 
             // Push to queues
@@ -314,6 +317,9 @@ void attitude_acquire_from_phone_imu(attitude_t *state_attitude)
 {
 
         state_attitude->yaw = phone_imu_attitude.yaw;
+        state_attitude->roll = phone_imu_attitude.roll;
+        state_attitude->pitch = phone_imu_attitude.pitch;
+
 
 }
 bool sensorsPhoneImuTest(void)

@@ -50,14 +50,18 @@
 // Definition of eeprom and deck I2C buss,use two i2c with 400Khz clock simultaneously could trigger the watchdog
 #define I2C_DEFAULT_DECK_CLOCK_SPEED                100000
 
+
+#define I2C_PIN_SDA_GPIO        11
+#define I2C_PIN_SCL_GPIO        10
+
 static bool isinit_i2cPort[2] = {0, 0};
 
 // Cost definitions of busses
 static const I2cDef sensorBusDef = {
     .i2cPort            = I2C_NUM_0,
     .i2cClockSpeed      = I2C_DEFAULT_SENSORS_CLOCK_SPEED,
-    .gpioSCLPin         = CONFIG_I2C0_PIN_SCL,
-    .gpioSDAPin         = CONFIG_I2C0_PIN_SDA,
+    .gpioSCLPin         = I2C_PIN_SCL_GPIO,
+    .gpioSDAPin         = I2C_PIN_SDA_GPIO,
     .gpioPullup         = GPIO_PULLUP_DISABLE,
 };
 

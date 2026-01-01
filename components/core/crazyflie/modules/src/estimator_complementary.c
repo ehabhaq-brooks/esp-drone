@@ -98,6 +98,8 @@ void estimatorComplementary(state_t *state, sensorData_t *sensorData, control_t 
     // only acquiring yaw angle from phone imu
     attitude_acquire_from_phone_imu(&phone_attitude);
     state->attitude.yaw = phone_attitude.yaw; // Use yaw from phone IMU
+    state->attitude.roll = phone_attitude.roll; // Use roll from phone IMU
+    state->attitude.pitch = phone_attitude.pitch; // Use pitch from phone IMU
 
     // Save quaternion, hopefully one day this could be used in a better controller.
     // Note that this is not adjusted for the legacy coordinate system
@@ -123,6 +125,7 @@ void estimatorComplementary(state_t *state, sensorData_t *sensorData, control_t 
       // If we have a position measurement, use it to correct the position estimate
       state->velocity.x = velocityMeasurement.vx;
       state->velocity.y = velocityMeasurement.vy;
+      state->velocity.z = velocityMeasurement.vz;
       
       //latestTofMeasurement(&tofMeasurement);
       positionEstimate(state, sensorData, &positionMeasurement, POS_UPDATE_DT, tick);
