@@ -278,8 +278,8 @@ static void phoneImuTask(void* arg)
             phone_velocity.vz = deadband(positionPkt.vz, 0.00);
 
             // Update phone IMU attitude
-            phone_imu_attitude.roll = positionPkt.roll; 
-            phone_imu_attitude.pitch = positionPkt.pitch; // Invert pitch to match Crazyflie convention
+            phone_imu_attitude.roll = -positionPkt.roll; // Invert roll to match Crazyflie convention
+            phone_imu_attitude.pitch = positionPkt.pitch; 
             phone_imu_attitude.yaw = - positionPkt.yaw; //reverse sign to match with crazyflie coordinate system
 
             // Push to queues
